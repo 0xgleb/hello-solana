@@ -1,16 +1,45 @@
+import * as assert from "assert";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
+const { SystemProgram } = anchor.web3;
 import { HelloSolana } from "../target/types/hello_solana";
 
-describe("hello-solana", () => {
-  // Configure the client to use the local cluster.
-  anchor.setProvider(anchor.AnchorProvider.env());
-
+describe("calculatordapp", () => {
+  const provider = anchor.AnchorProvider.local();
+  anchor.setProvider(provider);
+  const calculator = anchor.web3.Keypair.generate();
   const program = anchor.workspace.HelloSolana as Program<HelloSolana>;
 
-  it("Is initialized!", async () => {
-    // Add your test here.
-    const tx = await program.methods.initialize().rpc();
-    console.log("Your transaction signature", tx);
+  it("Creates a calculator", async () => {
+    await program.methods
+      .create("Hello Solana!")
+      .accounts({
+        calculator: calculator.publicKey,
+        user: provider.wallet.publicKey,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([calculator])
+      .rpc();
+
+    const account = await program.account.calculator.fetch(
+      calculator.publicKey
+    );
+
+    assert.ok(account.greeting === "Hello Solana!");
+  });
+
+  it("Adds numbers", async () => {
+    await program.methods
+      .add(new anchor.BN(2), new anchor.BN(3))
+      .accounts({
+        calculator: calculator.publicKey,
+      })
+      .rpc();
+
+    const account = await program.account.calculator.fetch(
+      calculator.publicKey
+    );
+
+    assert.ok(account.result.eq(new anchor.BN(5)));
   });
 });
